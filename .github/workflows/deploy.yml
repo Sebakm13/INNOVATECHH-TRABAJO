@@ -36,34 +36,47 @@ jobs:
         script: |
           echo "¡Conectado con éxito a AWS vía SSH!"
           
-          # 1. Crear o entrar al directorio correcto
-          mkdir -p /home/ubuntu/INNOVATECHH-TRABAJO
-          cd /home/ubuntu/INNOVATECHH-TRABAJO
+          # 1. Instalar Docker Compose si la máquina no lo tiene instalado
+          if ! command -v docker-compose &> /dev/null; then
+            echo "Instalando Docker Compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose || true
+          fi
           
-          # 2. Detener contenedores antiguos de forma limpia si existen
+          # 2. Configurar la ruta correcta usando ec2-user
+          mkdir -p /home/ec2-user/INNOVATECHH-TRABAJO
+          cd /home/ec2-user/INNOVATECHH-TRABAJO
+          
+          # 3. Detener cualquier contenedor huérfano antiguo de forma limpia
           sudo docker-compose down --remove-orphans || true
           sudo docker system prune -f || true
           
-          # 3. Sincronizar el código de GitHub a la máquina de AWS
+          # 4. Forzar la sincronización del código limpio
+          echo "Sincronizando cambios de código desde GitHub..."
           if [ -d ".git" ]; then
             git reset --hard
             git pull origin main
           else
-            rm -rf * .git || true
+            cd ..
+            rm -rf INNOVATECHH-TRABAJO
+            mkdir -p INNOVATECHH-TRABAJO
+            cd INNOVATECHH-TRABAJO
             git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git .
           fi
           
-          # 4. Asegurar permisos para usuarios No-Root
-          sudo chown -R ubuntu:ubuntu /home/ubuntu/INNOVATECHH-TRABAJO
-          sudo chmod -R 755 /home/ubuntu/INNOVATECHH-TRABAJO
+          # 5. Asegurar los permisos de lectura para los usuarios No-Root con ec2-user
+          sudo chown -R ec2-user:ec2-user /home/ec2-user/INNOVATECHH-TRABAJO
+          sudo chmod -R 755 /home/ec2-user/INNOVATECHH-TRABAJO
           
-          # 5. Construir y levantar todo el stack
+          # 6. Construir y levantar todo el ecosistema (Front, Backs y MySQL)
+          echo "Iniciando compilación y despliegue con Docker Compose..."
           sudo docker-compose up --build -d
           
-          # 6. Esperar a que inicien y revisar si están corriendo o se cayeron
-          echo "Esperando que los servicios levanten..."
-          sleep 10
+          # 7. Esperar a que los servicios levanten y validar el estado real
+          echo "Esperando 15 segundos para dar tiempo a la compilación interna..."
+          sleep 15
           echo "=== CONTENEDORES ACTIVOS ==="
           sudo docker ps
-          echo "=== CONTENEDORES CAÍDOS O CON ERROR ==="
+          echo "=== TODOS LOS CONTENEDORES (LOG DE REVISIÓN) ==="
           sudo docker ps -a
