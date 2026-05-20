@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # --- SERVICIO FRONTEND (REACT + NGINX) ---
+  innovatech-frontend:
+    build:
+      context: ./Innovatech-frontend
+      dockerfile: Dockerfile
+    container_name: innovatech_frontend_container
+    ports:
+      - "80:80" # Redirecciona el puerto 80 público de AWS al contenedor
+    depends_on:
+      - backend-despachos
+      - backend-ventas
+    networks:
+      - innovatech_network
+
+  # --- MICROSERVICIO BACKEND 1 (DESPACHOS) ---
+  backend-despachos:
+    build:
+      context: ./innovatech-backend/back-Despachos_SpringBoot
+      dockerfile: Dockerfile
+    container_name: backend_despachos_container
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql_db
+    networks:
+      - innovatech_network
+
+  # --- MICROSERVICIO BACKEND 2 (VENTAS) ---
+  backend-ventas:
+    build:
+      context: ./innovatech-backend/back-Ventas_SpringBoot
+      dockerfile: Dockerfile
+    container_name: backend_ventas_container
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql_db
+    networks:
+      - innovatech_network
+
+  # --- BASE DE DATOS (MYSQL 8.0 con Persistencia) ---
+  mysql_db:
+    image: mysql:8.0
+    container_name: mysql_database_container
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_DATABASE=innovatech_db
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    volumes:
+      - innovatech_data:/var/lib/mysql # Aquí se aplica el Named Volume que justificamos en el README
+    networks:
+      - innovatech_network
+
+# --- REDES INTERNAS (SEGURIDAD REQUERIDA POR EL CASO) ---
+networks:
+  innovatech_network:
+    driver: bridge
+
+# --- VOLÚMENES NOMBRADOS PARA PERSISTENCIA ---
+volumes:
+  innovatech_data:
+    driver: local
