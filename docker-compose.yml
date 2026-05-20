@@ -4,8 +4,8 @@ services:
   # --- SERVICIO FRONTEND (REACT + NGINX) ---
   innovatech-frontend:
     build:
-      context: ./Innovatech-frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Innovatech-frontend/Dockerfile
     container_name: innovatech_frontend_container
     ports:
       - "80:80"
@@ -18,8 +18,8 @@ services:
   # --- MICROSERVICIO BACKEND 1 (DESPACHOS) ---
   backend-despachos:
     build:
-      context: ./back-Despachos_SpringBoot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: back-Despachos_SpringBoot/Dockerfile
     container_name: backend_despachos_container
     ports:
       - "8081:8081"
@@ -35,8 +35,8 @@ services:
   # --- MICROSERVICIO BACKEND 2 (VENTAS) ---
   backend-ventas:
     build:
-      context: ./back-Ventas_SpringBoot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: back-Ventas_SpringBoot/Dockerfile
     container_name: backend_ventas_container
     ports:
       - "8082:8082"
