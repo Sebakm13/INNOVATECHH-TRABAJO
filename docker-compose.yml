@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: innovatech_frontend_container
     ports:
-      - "80:80" # Redirecciona el puerto 80 público de AWS al contenedor
+      - "80:80"
     depends_on:
       - backend-despachos
       - backend-ventas
@@ -18,7 +18,7 @@ services:
   # --- MICROSERVICIO BACKEND 1 (DESPACHOS) ---
   backend-despachos:
     build:
-      context: ./innovatech-backend/back-Despachos_SpringBoot
+      context: ./back-Despachos_SpringBoot
       dockerfile: Dockerfile
     container_name: backend_despachos_container
     ports:
@@ -35,7 +35,7 @@ services:
   # --- MICROSERVICIO BACKEND 2 (VENTAS) ---
   backend-ventas:
     build:
-      context: ./innovatech-backend/back-Ventas_SpringBoot
+      context: ./back-Ventas_SpringBoot
       dockerfile: Dockerfile
     container_name: backend_ventas_container
     ports:
@@ -49,7 +49,7 @@ services:
     networks:
       - innovatech_network
 
-  # --- BASE DE DATOS (MYSQL 8.0 con Persistencia) ---
+  # --- BASE DE DATOS (MYSQL 8.0) ---
   mysql_db:
     image: mysql:8.0
     container_name: mysql_database_container
@@ -60,16 +60,14 @@ services:
       - MYSQL_DATABASE=innovatech_db
       - MYSQL_ROOT_PASSWORD=rootpassword
     volumes:
-      - innovatech_data:/var/lib/mysql # Aquí se aplica el Named Volume que justificamos en el README
+      - innovatech_data:/var/lib/mysql
     networks:
       - innovatech_network
 
-# --- REDES INTERNAS (SEGURIDAD REQUERIDA POR EL CASO) ---
 networks:
   innovatech_network:
     driver: bridge
 
-# --- VOLÚMENES NOMBRADOS PARA PERSISTENCIA ---
 volumes:
   innovatech_data:
     driver: local
