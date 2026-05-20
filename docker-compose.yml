@@ -1,7 +1,5 @@
 version: '3.8'
-
 services:
-  # --- SERVICIO FRONTEND (REACT + NGINX) ---
   innovatech-frontend:
     build:
       context: .
@@ -10,35 +8,17 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend-despachos
-      - backend-ventas
+      - innovatech-backend
     networks:
       - innovatech_network
 
-  # --- MICROSERVICIO BACKEND 1 (DESPACHOS) ---
-  backend-despachos:
+  innovatech-backend:
     build:
       context: .
-      dockerfile: back-Despachos_SpringBoot/Dockerfile
-    container_name: backend_despachos_container
+      dockerfile: innovatech-backend/Dockerfile
+    container_name: innovatech_backend_container
     ports:
       - "8081:8081"
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=rootpassword
-    depends_on:
-      - mysql_db
-    networks:
-      - innovatech_network
-
-  # --- MICROSERVICIO BACKEND 2 (VENTAS) ---
-  backend-ventas:
-    build:
-      context: .
-      dockerfile: back-Ventas_SpringBoot/Dockerfile
-    container_name: backend_ventas_container
-    ports:
       - "8082:8082"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
@@ -49,7 +29,6 @@ services:
     networks:
       - innovatech_network
 
-  # --- BASE DE DATOS (MYSQL 8.0) ---
   mysql_db:
     image: mysql:8.0
     container_name: mysql_database_container
