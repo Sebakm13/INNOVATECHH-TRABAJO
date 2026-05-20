@@ -1,0 +1,89 @@
+name: Pipeline CI/CD Monorepo Innovatech
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v3
+
+      - name: Autenticar en Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Compilar y subir Frontend
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/innovatech-frontend:latest ./Innovatech-frontend
+          docker push ${{ secrets.DOCKER_USERNAME }}/innovatech-frontend:latest
+
+      - name: Compilar y subir Backend
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/innovatech-backend:latest ./Innovatech-backend
+          docker push ${{ secrets.DOCKER_USERNAME }}/innovatech-backend:latest
+
+  deploy-to-aws:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Ejecutar Despliegue en AWS via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            # 1. Crear y entrar a una carpeta segura
+            mkdir -p /tmp/innovatech-app
+            cd /tmp/innovatech-app
+
+            # 2. Iniciar sesión en Docker Hub
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+            # 3. Crear la red interna aislada si no existe
+            docker network create innovatech-net || true
+
+            # 4. Apagar y eliminar de raíz cualquier contenedor viejo de forma segura
+            docker stop innovatech-front innovatech-back mysql-db || true
+            docker rm innovatech-front innovatech-back mysql-db || true
+
+            # 5. Descargar las últimas versiones limpias de las imágenes (Esto ignora la caché local automáticamente)
+            docker pull mysql:8.0
+            docker pull ${{ secrets.DOCKER_USERNAME }}/innovatech-backend:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/innovatech-frontend:latest
+
+            # 6. LEVANTAR EL STACK CORRECTO (Orden estricto de dependencias)
+            
+            # A) Base de Datos MySQL
+            docker run -d --name mysql-db --network innovatech-net \
+              -e MYSQL_ROOT_PASSWORD=secret \
+              -e MYSQL_DATABASE=innovatech_metadata \
+              -v mysql-data:/var/lib/mysql mysql:8.0
+            
+            # Esperamos 15 segundos a que MySQL inicialice sus procesos internos
+            sleep 15
+
+            # B) Backend (Escuchando en el puerto interno 8080)
+            docker run -d --name innovatech-back --network innovatech-net -p 8080:8080 \
+              -e PORT=8080 \
+              -e DB_HOST=mysql-db \
+              -e DB_USER=root \
+              -e DB_PASSWORD=secret \
+              -e DB_NAME=innovatech_metadata \
+              ${{ secrets.DOCKER_USERNAME }}/innovatech-backend:latest
+            
+            # Esperamos 5 segundos a que el backend active su puerto
+            sleep 5
+
+            # C) Frontend (Nginx amarrado al puerto público 80 con la configuración global que ya creamos)
+            docker run -d --name innovatech-front --network innovatech-net -p 80:80 ${{ secrets.DOCKER_USERNAME }}/innovatech-frontend:latest
+
+            # 7. AUDITORÍA DE LOGS FINALES
+            echo "=== CONFIGURACIÓN FINAL DEL BACKEND ==="
+            docker logs innovatech-back
