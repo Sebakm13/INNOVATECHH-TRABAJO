@@ -8,17 +8,33 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - innovatech-backend
+      - backend-despachos
+      - backend-ventas
     networks:
       - innovatech_network
 
-  innovatech-backend:
+  backend-despachos:
     build:
-      context: .
-      dockerfile: innovatech-backend/Dockerfile
-    container_name: innovatech_backend_container
+      context: ./innovatech-backend/back-Despachos_SpringBoot
+      dockerfile: Dockerfile
+    container_name: backend_despachos_container
     ports:
       - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql_db
+    networks:
+      - innovatech_network
+
+  backend-ventas:
+    build:
+      context: ./innovatech-backend/back-Ventas_SpringBoot
+      dockerfile: Dockerfile
+    container_name: backend_ventas_container
+    ports:
       - "8082:8082"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
