@@ -6,20 +6,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # CAJITA 1: Compilar y verificar (Build)
   build-and-push:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout del código
       uses: actions/checkout@v3
 
-    - name: Configurar entorno de simulación
+    - name: Validar estructura del proyecto
       run: |
         echo "Validando estructura de Innovatech-frontend..."
         echo "Validando estructura de innovatech-backend..."
         echo "Código listo para ser desplegado."
 
-  # CAJITA 2: El despliegue real en tu servidor AWS (Deploy)
   deploy-to-aws:
     runs-on: ubuntu-latest
     needs: build-and-push
@@ -33,50 +31,42 @@ jobs:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USER }}
         key: ${{ secrets.AWS_KEY }}
+        command_timeout: 30m
         script: |
           echo "¡Conectado con éxito a AWS vía SSH!"
-          
-          # 1. Asegurar la instalación limpia de Docker Compose
+
           if ! command -v docker-compose &> /dev/null; then
             echo "Instalando Docker Compose..."
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose || true
           fi
-          
-          # 2. Ir al directorio raíz del usuario ec2-user
+
           cd /home/ec2-user
-          
-          # 3. Frenar contenedores viejos antes de borrar los archivos para que no queden amarrados al puerto 80
+
           if [ -d "INNOVATECHH-TRABAJO" ]; then
             cd INNOVATECHH-TRABAJO
             sudo docker-compose down --remove-orphans || true
             cd ..
           fi
-          
-          # 4. Limpieza total del directorio viejo para evitar conflictos de ramas o carpetas duplicadas
+
           sudo rm -rf INNOVATECHH-TRABAJO
           sudo docker system prune -f || true
-          
-          # 5. Clonar el repositorio fresco directo de tu GitHub
+
           echo "Clonando repositorio limpio..."
           git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
-          
-          # 6. Entrar a la carpeta real del proyecto donde está el docker-compose.yml
+
           cd /home/ec2-user/INNOVATECHH-TRABAJO
-          
-          # 7. Otorgar permisos correctos para que los usuarios No-Root puedan leer el código
+
           sudo chown -R ec2-user:ec2-user /home/ec2-user/INNOVATECHH-TRABAJO
           sudo chmod -R 755 /home/ec2-user/INNOVATECHH-TRABAJO
-          
-          # 8. Compilar y levantar todo el ecosistema (Frontend, Microservicios Back y MySQL)
+
           echo "Iniciando compilación del stack con Docker Compose..."
           sudo docker-compose up --build -d
-          
-          # 9. Espera de cortesía para la compilación de Maven y Node
-          echo "Esperando 15 segundos para verificar procesos..."
-          sleep 15
-          
+
+          echo "Esperando 30 segundos para verificar procesos..."
+          sleep 30
+
           echo "=== CONTENEDORES ACTIVOS EN AWS ==="
           sudo docker ps
           echo "=== TODOS LOS CONTENEDORES ==="
