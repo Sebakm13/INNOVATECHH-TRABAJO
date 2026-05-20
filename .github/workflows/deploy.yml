@@ -36,15 +36,15 @@ jobs:
         script: |
           echo "¡Conectado con éxito a AWS vía SSH!"
           
-          # 1. Crear o entrar al directorio de trabajo con el usuario estándar
+          # 1. Crear o entrar al directorio correcto
           mkdir -p /home/ubuntu/INNOVATECHH-TRABAJO
           cd /home/ubuntu/INNOVATECHH-TRABAJO
           
-          # 2. Detener y limpiar a fondo contenedores o recursos huérfanos antes de actualizar
+          # 2. Detener contenedores antiguos de forma limpia si existen
           sudo docker-compose down --remove-orphans || true
-          sudo docker system prunes -f || true
+          sudo docker system prune -f || true
           
-          # 3. Sincronizar el código SIN sudo para evitar bloqueos de permisos No-Root
+          # 3. Sincronizar el código de GitHub a la máquina de AWS
           if [ -d ".git" ]; then
             git reset --hard
             git pull origin main
@@ -53,13 +53,17 @@ jobs:
             git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git .
           fi
           
-          # 4. Asegurar que los usuarios internos de los Dockerfiles tengan acceso de lectura
+          # 4. Asegurar permisos para usuarios No-Root
           sudo chown -R ubuntu:ubuntu /home/ubuntu/INNOVATECHH-TRABAJO
           sudo chmod -R 755 /home/ubuntu/INNOVATECHH-TRABAJO
           
-          # 5. Construir y levantar el stack completo con las rutas corregidas
+          # 5. Construir y levantar todo el stack
           sudo docker-compose up --build -d
           
-          # 6. Esperar 5 segundos y verificar qué contenedores quedaron realmente corriendo
-          sleep 5
+          # 6. Esperar a que inicien y revisar si están corriendo o se cayeron
+          echo "Esperando que los servicios levanten..."
+          sleep 10
+          echo "=== CONTENEDORES ACTIVOS ==="
           sudo docker ps
+          echo "=== CONTENEDORES CAÍDOS O CON ERROR ==="
+          sudo docker ps -a
