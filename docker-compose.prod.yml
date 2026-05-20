@@ -1,0 +1,65 @@
+version: '3.8'
+services:
+  innovatech-frontend:
+    image: sebakm12333/innovatech-frontend:latest
+    container_name: innovatech_frontend_container
+    restart: on-failure
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-despachos
+      - backend-ventas
+    networks:
+      - innovatech_network
+
+  backend-despachos:
+    image: sebakm12333/innovatech-backend-despachos:latest
+    container_name: backend_despachos_container
+    restart: on-failure
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql_db
+    networks:
+      - innovatech_network
+
+  backend-ventas:
+    image: sebakm12333/innovatech-backend-ventas:latest
+    container_name: backend_ventas_container
+    restart: on-failure
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql_db
+    networks:
+      - innovatech_network
+
+  mysql_db:
+    image: mysql:8.0
+    container_name: mysql_database_container
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_DATABASE=innovatech_db
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    volumes:
+      - innovatech_data:/var/lib/mysql
+    networks:
+      - innovatech_network
+
+networks:
+  innovatech_network:
+    driver: bridge
+
+volumes:
+  innovatech_data:
+    driver: local
