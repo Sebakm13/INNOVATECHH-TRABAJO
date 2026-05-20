@@ -2,8 +2,8 @@ version: '3.8'
 services:
   innovatech-frontend:
     build:
-      context: .
-      dockerfile: Innovatech-frontend/Dockerfile
+      context: ./Innovatech-frontend/front_despacho
+      dockerfile: ../Dockerfile
     container_name: innovatech_frontend_container
     ports:
       - "80:80"
