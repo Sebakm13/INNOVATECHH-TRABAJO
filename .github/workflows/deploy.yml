@@ -1,8 +1,7 @@
 name: Pipeline CI/CD Monorepo Innovatech
-
 on:
   push:
-    branches: [ main ]
+    branches: [ deploy ]
   workflow_dispatch:
 
 jobs:
@@ -53,38 +52,41 @@ jobs:
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.AWS_HOST }}
-        username: ${{ secrets.AWS_USER }}
+        username: ec2-user
         key: ${{ secrets.AWS_KEY }}
-        command_timeout: 45m
+        command_timeout: 10m
         script: |
-          echo "Conectado a AWS EC2"
+          echo "=== Verificando Docker ==="
+          if ! command -v docker &> /dev/null; then
+            echo "Instalando Docker..."
+            sudo yum update -y
+            sudo yum install -y docker
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            sudo usermod -aG docker ec2-user
+          fi
 
           if ! command -v docker-compose &> /dev/null; then
             echo "Instalando Docker Compose..."
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-            sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose || true
+            sudo ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
           fi
 
+          echo "=== Clonando/Actualizando repositorio ==="
           cd /home/ec2-user
-
           if [ -d "INNOVATECHH-TRABAJO" ]; then
-            cd INNOVATECHH-TRABAJO
-            sudo docker-compose down --remove-orphans || true
-            cd ..
+            cd INNOVATECHH-TRABAJO && git pull && cd ..
+          else
+            git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
           fi
 
-          sudo rm -rf INNOVATECHH-TRABAJO
-          sudo docker system prune -f || true
-
-          echo "Clonando repositorio..."
-          git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
+          echo "=== Desplegando stack ==="
           cd /home/ec2-user/INNOVATECHH-TRABAJO
+          sudo docker-compose down --remove-orphans || true
+          sudo docker system prune -f || true
+          sudo docker-compose -f docker-compose.prod.yml pull --quiet
+          sudo docker-compose -f docker-compose.prod.yml up -d --no-build
 
-          echo "Levantando stack con imágenes de Docker Hub..."
-          sudo docker-compose -f docker-compose.prod.yml pull
-          sudo docker-compose -f docker-compose.prod.yml up -d
-
-          sleep 20
           echo "=== CONTENEDORES ACTIVOS ==="
           sudo docker ps
