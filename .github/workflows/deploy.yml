@@ -55,7 +55,7 @@ jobs:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USER }}
         key: ${{ secrets.AWS_KEY }}
-        command_timeout: 15m
+        command_timeout: 45m
         script: |
           echo "Conectado a AWS EC2"
 
