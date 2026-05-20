@@ -12,11 +12,35 @@ jobs:
     - name: Checkout del código
       uses: actions/checkout@v3
 
-    - name: Validar estructura del proyecto
-      run: |
-        echo "Validando estructura de Innovatech-frontend..."
-        echo "Validando estructura de innovatech-backend..."
-        echo "Código listo para ser desplegado."
+    - name: Login a Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build y push Frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./Innovatech-frontend
+        file: ./Innovatech-frontend/Dockerfile
+        push: true
+        tags: sebakm12333/innovatech-frontend:latest
+
+    - name: Build y push Backend Despachos
+      uses: docker/build-push-action@v5
+      with:
+        context: ./innovatech-backend/back-Despachos_SpringBoot
+        file: ./innovatech-backend/back-Despachos_SpringBoot/Dockerfile
+        push: true
+        tags: sebakm12333/innovatech-backend-despachos:latest
+
+    - name: Build y push Backend Ventas
+      uses: docker/build-push-action@v5
+      with:
+        context: ./innovatech-backend/back-Ventas_SpringBoot
+        file: ./innovatech-backend/back-Ventas_SpringBoot/Dockerfile
+        push: true
+        tags: sebakm12333/innovatech-backend-ventas:latest
 
   deploy-to-aws:
     runs-on: ubuntu-latest
@@ -31,9 +55,9 @@ jobs:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USER }}
         key: ${{ secrets.AWS_KEY }}
-        command_timeout: 60m
+        command_timeout: 15m
         script: |
-          echo "¡Conectado con éxito a AWS vía SSH!"
+          echo "Conectado a AWS EC2"
 
           if ! command -v docker-compose &> /dev/null; then
             echo "Instalando Docker Compose..."
@@ -53,21 +77,14 @@ jobs:
           sudo rm -rf INNOVATECHH-TRABAJO
           sudo docker system prune -f || true
 
-          echo "Clonando repositorio limpio..."
+          echo "Clonando repositorio..."
           git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
-
           cd /home/ec2-user/INNOVATECHH-TRABAJO
 
-          sudo chown -R ec2-user:ec2-user /home/ec2-user/INNOVATECHH-TRABAJO
-          sudo chmod -R 755 /home/ec2-user/INNOVATECHH-TRABAJO
+          echo "Levantando stack con imágenes de Docker Hub..."
+          sudo docker-compose -f docker-compose.prod.yml pull
+          sudo docker-compose -f docker-compose.prod.yml up -d
 
-          echo "Iniciando compilación del stack con Docker Compose..."
-          sudo docker-compose up --build -d
-
-          echo "Esperando 30 segundos para verificar procesos..."
-          sleep 30
-
-          echo "=== CONTENEDORES ACTIVOS EN AWS ==="
+          sleep 20
+          echo "=== CONTENEDORES ACTIVOS ==="
           sudo docker ps
-          echo "=== TODOS LOS CONTENEDORES ==="
-          sudo docker ps -a
