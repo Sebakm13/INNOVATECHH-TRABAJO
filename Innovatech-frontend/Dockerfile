@@ -1,18 +1,20 @@
-# Etapa 1: Build de React
-FROM node:18-alpine AS build
+# --- Etapa 1: Construcción (Build) ---
+FROM node:20-alpine AS builder
 WORKDIR /app
-COPY front_despacho/package*.json ./
-RUN npm install
-COPY front_despacho/ .
+COPY package*.json ./
+RUN npm ci
+COPY . .
 RUN npm run build
 
-# Etapa 2: Servidor de producción seguro (Nginx)
+# --- Etapa 2: Producción ---
 FROM nginx:alpine
-RUN rm -rf /etc/nginx/conf.d/* /etc/nginx/nginx.conf
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copiar los archivos construidos a Nginx
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Configurar usuario no-root para Nginx (Buenas prácticas)
 RUN touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /etc/nginx
+    chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /usr/share/nginx/html
 USER nginx
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
