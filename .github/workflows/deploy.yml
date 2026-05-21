@@ -25,11 +25,10 @@ jobs:
     - name: Build y push Frontend
       uses: docker/build-push-action@v5
       with:
-        # CORREGIDO: El contexto debe ser la carpeta interna donde están el package.json y el código real
         context: ./Innovatech-frontend/front_despacho
         file: ./Innovatech-frontend/Dockerfile
         push: true
-        tags: sebakm12333/innovatech-frontend:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-frontend:latest
         build-args: |
           NPM_CONFIG_AUDIT=false
           NPM_CONFIG_FUND=false
@@ -41,7 +40,7 @@ jobs:
         context: ./innovatech-backend/back-Despachos_SpringBoot
         file: ./innovatech-backend/back-Despachos_SpringBoot/Dockerfile
         push: true
-        tags: sebakm12333/innovatech-backend-despachos:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend-despachos:latest
 
     - name: Build y push Backend Ventas
       uses: docker/build-push-action@v5
@@ -49,7 +48,7 @@ jobs:
         context: ./innovatech-backend/back-Ventas_SpringBoot
         file: ./innovatech-backend/back-Ventas_SpringBoot/Dockerfile
         push: true
-        tags: sebakm12333/innovatech-backend-ventas:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend-ventas:latest
 
   deploy-to-aws:
     runs-on: ubuntu-latest
@@ -63,12 +62,12 @@ jobs:
         key: ${{ secrets.AWS_KEY }}
         port: 22
         timeout: 30s
-        command_timeout: 45m
+        command_timeout: 10m
         script: |
-          echo "Conectado a AWS EC2"
-          
+          echo "Conectado exitosamente a AWS EC2"
           export DEBIAN_FRONTEND=noninteractive
           
+          # Verificar la instalación del plugin de docker compose v2
           if ! command -v docker-compose &> /dev/null; then
             sudo mkdir -p /usr/local/lib/docker/cli-plugins
             sudo curl -SL "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
@@ -76,24 +75,62 @@ jobs:
           fi
           
           USER_HOME="/home/${{ secrets.AWS_USER }}"
-          cd $USER_HOME
+          DEPLOY_DIR="$USER_HOME/innovatech_deploy"
           
-          if [ -d "INNOVATECHH-TRABAJO" ]; then
-            cd INNOVATECHH-TRABAJO
+          # Detener contenedores previos si el directorio de despliegue existe
+          if [ -d "$DEPLOY_DIR" ]; then
+            cd $DEPLOY_DIR
             sudo docker compose down --remove-orphans --timeout 2 || true
             cd $USER_HOME
-            sudo rm -rf INNOVATECHH-TRABAJO
+            sudo rm -rf $DEPLOY_DIR
           fi
           
+          # Limpieza forzada de procesos colgantes para evitar colisiones en los puertos expuestos
           sudo docker ps -aq | xargs -r sudo docker rm -f || true
           sudo docker system prune -af --volumes || true
           
-          git clone --depth 1 https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
+          # Crear un directorio limpio exclusivamente para la orquestación productiva
+          mkdir -p $DEPLOY_DIR
+          cd $DEPLOY_DIR
           
-          cd $USER_HOME/INNOVATECHH-TRABAJO
+          # Generación dinámica del docker-compose.prod.yml con las imágenes descargadas
+          cat << 'EOF' > docker-compose.prod.yml
+          version: '3.8'
+
+          services:
+            frontend:
+              image: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-frontend:latest
+              ports:
+                - "80:80"
+              restart: always
+              networks:
+                - innovatech_net
+
+            backend-despachos:
+              image: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend-despachos:latest
+              ports:
+                - "8081:8081"
+              restart: always
+              networks:
+                - innovatech_net
+
+            backend-ventas:
+              image: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend-ventas:latest
+              ports:
+                - "8082:8082"
+              restart: always
+              networks:
+                - innovatech_net
+
+          networks:
+            innovatech_net:
+              driver: bridge
+          EOF
           
+          # Descargar las imágenes actualizadas e inicializar los servicios en segundo plano
           sudo docker compose -f docker-compose.prod.yml pull --quiet
           sudo docker compose -f docker-compose.prod.yml up -d
           
-          sleep 5
+          # Pequeña pausa estricta para dar tiempo de inicialización de los procesos internos
+          sleep 10
           sudo docker compose -f docker-compose.prod.yml ps
