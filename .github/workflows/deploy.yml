@@ -62,6 +62,8 @@ jobs:
             cd ..
           fi
           sudo rm -rf INNOVATECHH-TRABAJO
+          sudo docker stop $(sudo docker ps -aq) || true
+          sudo docker rm $(sudo docker ps -aq) || true
           sudo docker system prune -f || true
           git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
           cd /home/ec2-user/INNOVATECHH-TRABAJO
