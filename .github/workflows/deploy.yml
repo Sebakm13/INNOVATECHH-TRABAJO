@@ -3,7 +3,7 @@ name: Pipeline CI/CD Monorepo Innovatech
 on:
   push:
     branches: 
-      - [cite_start]deploy # Conforme a la rúbrica [cite: 19, 48]
+      - main # CAMBIADO: Ahora se activará automáticamente al subir a la rama main
   workflow_dispatch:
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
         script: |
           echo "Conectado a AWS EC2"
           
-          # 1. Forzar modo no interactivo para que ningún comando pida confirmación manual
+          # Forzar modo no interactivo para evitar bloqueos
           export DEBIAN_FRONTEND=noninteractive
           
           # Validar e instalar docker-compose v2 si falta
@@ -70,7 +70,7 @@ jobs:
           USER_HOME="/home/${{ secrets.AWS_USER }}"
           cd $USER_HOME
           
-          # 2. Detener servicios previos con timeout estricto para evitar bloqueos interminables
+          # Detener servicios anteriores con timeout estricto para que no se quede colgado
           if [ -d "INNOVATECHH-TRABAJO" ]; then
             cd INNOVATECHH-TRABAJO
             sudo docker compose down --remove-orphans --timeout 2 || true
@@ -78,19 +78,19 @@ jobs:
             sudo rm -rf INNOVATECHH-TRABAJO
           fi
           
-          # 3. Forzar matado inmediato de contenedores huérfanos y limpiar caché a fondo de forma silenciosa
+          # Limpieza total inmediata de contenedores huérfanos
           sudo docker ps -aq | xargs -r sudo docker rm -f || true
           sudo docker system prune -af --volumes || true
           
-          # 4. Clonar de forma ultra rápida (sólo el último commit) y sin pedir credenciales en bucle
+          # Clonar rápido (sólo último commit) para evitar congelamientos de consola
           git clone --depth 1 https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
           
           cd $USER_HOME/INNOVATECHH-TRABAJO
           
-          # 5. Descargar las nuevas imágenes de Docker Hub en modo silencioso y levantar el entorno productivo
+          # Descargar imágenes de Docker Hub de forma silenciosa y levantar
           sudo docker compose -f docker-compose.prod.yml pull --quiet
           sudo docker compose -f docker-compose.prod.yml up -d
           
-          # 6. Comprobación rápida del estado
+          # Verificación final express
           sleep 5
           sudo docker compose -f docker-compose.prod.yml ps
