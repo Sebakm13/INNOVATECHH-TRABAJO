@@ -3,7 +3,7 @@ name: Pipeline CI/CD Monorepo Innovatech
 on:
   push:
     branches: 
-      - main # CAMBIADO: Ahora se activará automáticamente al subir a la rama main
+      - main # Activado automáticamente al subir a la rama main
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
     - name: Build y push Frontend
       uses: docker/build-push-action@v5
       with:
-        context: ./Innovatech-frontend/front_despacho
+        context: ./Innovatech-frontend
         file: ./Innovatech-frontend/Dockerfile
         push: true
         tags: sebakm12333/innovatech-frontend:latest
@@ -53,6 +53,8 @@ jobs:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USER }}
         key: ${{ secrets.AWS_KEY }}
+        port: 22
+        timeout: 30s # Evita que GitHub se quede congelado eternamente si la IP cambia en AWS Academy
         command_timeout: 45m
         script: |
           echo "Conectado a AWS EC2"
