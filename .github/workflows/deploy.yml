@@ -1,92 +1,47 @@
-name: Pipeline CI/CD Monorepo Innovatech
+name: CI/CD Pipeline - Innovatech
+
 on:
   push:
-    branches: [ deploy ]
-  workflow_dispatch:
+    branches:
+      - deploy # Trigger obligatorio según pauta
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout del código
-      uses: actions/checkout@v3
+      - name: Checkout del código
+        uses: actions/checkout@v3
 
-    - name: Login a Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Autenticación en Docker Hub (o AWS ECR si lo prefieres)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build y push Frontend
-      uses: docker/build-push-action@v5
-      with:
-        context: ./Innovatech-frontend
-        file: ./Innovatech-frontend/Dockerfile
-        push: true
-        tags: sebakm12333/innovatech-frontend:latest
+      # Construcción y subida de la imagen
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-app:latest
 
-    - name: Build y push Backend Despachos
-      uses: docker/build-push-action@v5
-      with:
-        context: ./innovatech-backend/back-Despachos_SpringBoot
-        file: ./innovatech-backend/back-Despachos_SpringBoot/Dockerfile
-        push: true
-        tags: sebakm12333/innovatech-backend-despachos:latest
-
-    - name: Build y push Backend Ventas
-      uses: docker/build-push-action@v5
-      with:
-        context: ./innovatech-backend/back-Ventas_SpringBoot
-        file: ./innovatech-backend/back-Ventas_SpringBoot/Dockerfile
-        push: true
-        tags: sebakm12333/innovatech-backend-ventas:latest
-
-  deploy-to-aws:
-    runs-on: ubuntu-latest
+  deploy:
     needs: build-and-push
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout del código
-      uses: actions/checkout@v3
-
-    - name: Desplegar en AWS EC2 vía SSH
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.AWS_HOST }}
-        username: ec2-user
-        key: ${{ secrets.AWS_KEY }}
-        command_timeout: 10m
-        script: |
-          echo "=== Verificando Docker ==="
-          if ! command -v docker &> /dev/null; then
-            echo "Instalando Docker..."
-            sudo yum update -y
-            sudo yum install -y docker
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            sudo usermod -aG docker ec2-user
-          fi
-
-          if ! command -v docker-compose &> /dev/null; then
-            echo "Instalando Docker Compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            sudo ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-          fi
-
-          echo "=== Clonando/Actualizando repositorio ==="
-          cd /home/ec2-user
-          if [ -d "INNOVATECHH-TRABAJO" ]; then
-            cd INNOVATECHH-TRABAJO && git pull && cd ..
-          else
-            git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
-          fi
-
-          echo "=== Desplegando stack ==="
-          cd /home/ec2-user/INNOVATECHH-TRABAJO
-          sudo docker-compose down --remove-orphans || true
-          sudo docker system prune -f || true
-          sudo docker-compose -f docker-compose.prod.yml pull --quiet
-          sudo docker-compose -f docker-compose.prod.yml up -d --no-build
-
-          echo "=== CONTENEDORES ACTIVOS ==="
-          sudo docker ps
+      # Conexión SSH a tu instancia EC2 de AWS para actualizar el contenedor
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user # o ubuntu dependiendo de tu AMI
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-app:latest
+            # Aquí detienes el contenedor viejo y corres el nuevo, o ejecutas docker-compose
+            cd /home/ec2-user/proyecto
+            sudo docker-compose down
+            sudo docker-compose up -d
