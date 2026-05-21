@@ -3,7 +3,7 @@ name: Pipeline CI/CD Monorepo Innovatech
 on:
   push:
     branches: 
-      - main # Activado automáticamente al subir a la rama main
+      - main
   workflow_dispatch:
 
 jobs:
@@ -62,41 +62,40 @@ jobs:
         key: ${{ secrets.AWS_KEY }}
         port: 22
         timeout: 30s
-        command_timeout: 10m
+        command_timeout: 15m
         script: |
-          echo "Conectado exitosamente a AWS EC2"
+          set -e
           export DEBIAN_FRONTEND=noninteractive
-          
-          # Verificar la instalación del plugin de docker compose v2
-          if ! command -v docker-compose &> /dev/null; then
+
+          # Instalar docker compose v2 si no existe
+          if ! docker compose version &> /dev/null; then
             sudo mkdir -p /usr/local/lib/docker/cli-plugins
-            sudo curl -SL "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            sudo curl -fsSL "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" \
+              -o /usr/local/lib/docker/cli-plugins/docker-compose
             sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
           fi
-          
-          USER_HOME="/home/${{ secrets.AWS_USER }}"
-          DEPLOY_DIR="$USER_HOME/innovatech_deploy"
-          
-          # Detener contenedores previos si el directorio de despliegue existe
-          if [ -d "$DEPLOY_DIR" ]; then
-            cd $DEPLOY_DIR
-            sudo docker compose down --remove-orphans --timeout 2 || true
-            cd $USER_HOME
-            sudo rm -rf $DEPLOY_DIR
-          fi
-          
-          # Limpieza forzada de procesos colgantes para evitar colisiones en los puertos expuestos
-          sudo docker ps -aq | xargs -r sudo docker rm -f || true
-          sudo docker system prune -af --volumes || true
-          
-          # Crear un directorio limpio exclusivamente para la orquestación productiva
-          mkdir -p $DEPLOY_DIR
-          cd $DEPLOY_DIR
-          
-          # Generación dinámica del docker-compose.prod.yml con las imágenes descargadas
-          cat << 'EOF' > docker-compose.prod.yml
-          version: '3.8'
 
+          DEPLOY_DIR="/home/${{ secrets.AWS_USER }}/innovatech_deploy"
+
+          # Bajar contenedores previos
+          if [ -d "$DEPLOY_DIR" ]; then
+            cd "$DEPLOY_DIR"
+            sudo docker compose down --remove-orphans --timeout 10 || true
+            cd ~
+            sudo rm -rf "$DEPLOY_DIR"
+          fi
+
+          # Limpiar todo sin confirmación
+          sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker system prune -af --volumes 2>/dev/null || true
+
+          # Crear directorio de deploy
+          mkdir -p "$DEPLOY_DIR"
+          cd "$DEPLOY_DIR"
+
+          # Generar docker-compose.prod.yml
+          cat > docker-compose.prod.yml << 'EOF'
+          version: '3.8'
           services:
             frontend:
               image: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-frontend:latest
@@ -126,11 +125,9 @@ jobs:
             innovatech_net:
               driver: bridge
           EOF
-          
-          # Descargar las imágenes actualizadas e inicializar los servicios en segundo plano
-          sudo docker compose -f docker-compose.prod.yml pull --quiet
-          sudo docker compose -f docker-compose.prod.yml up -d
-          
-          # Pequeña pausa estricta para dar tiempo de inicialización de los procesos internos
-          sleep 10
-          sudo docker compose -f docker-compose.prod.yml ps
+
+          # Pull e inicio
+          sudo docker compose -f docker-compose.prod.yml pull
+          sudo docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+          echo "✅ Deploy exitoso"
