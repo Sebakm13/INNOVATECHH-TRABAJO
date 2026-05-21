@@ -29,3 +29,5 @@ build-and-push: Se encarga de revisar que la estructura del código esté en ord
 deploy-to-aws: Se conecta por SSH a nuestra instancia EC2 usando credenciales seguras (GitHub Secrets). Borra los contenedores viejos con cambios desactualizados, se trae lo nuevo de Git y levanta el stack limpio con un docker-compose up --build -d.
 
 Toda la configuración sensible (IP de AWS, usuario y claves SSH) está protegida en la sección de Secrets del repositorio para no exponer datos públicos.
+
+ Y de final se puede ver un trabajo exitoso ya que se puede ver como el pipeline los docker todo en si las imagenes hacen su funcion y arroja el frontend a la perfeccion al ingresar la ip publica a internet
