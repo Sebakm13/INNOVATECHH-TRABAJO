@@ -18,7 +18,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./Innovatech-frontend/front_despacho
-        file: ./Innovatech-frontend/front_despacho/Dockerfile
+        file: ./Innovatech-frontend/Dockerfile
         push: true
         tags: sebakm12333/innovatech-frontend:latest
     - name: Build y push Backend Despachos
