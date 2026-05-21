@@ -1,65 +1,54 @@
 version: '3.8'
+
 services:
-  innovatech-frontend:
-    image: sebakm12333/innovatech-frontend:latest
-    container_name: innovatech_frontend_container
-    restart: on-failure
+  frontend:
+    build:
+      context: ./frontend  # Cambia a la ruta real de tu carpeta front
+      dockerfile: Dockerfile
     ports:
       - "80:80"
-    depends_on:
-      - backend-despachos
-      - backend-ventas
-    networks:
-      - innovatech_network
-
-  backend-despachos:
-    image: sebakm12333/innovatech-backend-despachos:latest
-    container_name: backend_despachos_container
-    restart: on-failure
-    ports:
-      - "8081:8081"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - BACKEND_URL=http://tu-ip-o-dominio-ec2:3000
     depends_on:
-      - mysql_db
+      - backend
     networks:
-      - innovatech_network
+      - red-innovatech
 
-  backend-ventas:
-    image: sebakm12333/innovatech-backend-ventas:latest
-    container_name: backend_ventas_container
-    restart: on-failure
+  backend:
+    build:
+      context: ./backend   # Cambia a la ruta real de tu carpeta back
+      dockerfile: Dockerfile
     ports:
-      - "8082:8082"
+      - "3000:3000"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/innovatech_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - DB_HOST=db
+      - DB_USER=usuario_prod
+      - DB_PASSWORD=secreto_seguro
+      - DB_NAME=innovatech_db
     depends_on:
-      - mysql_db
+      - db
     networks:
-      - innovatech_network
-
-  mysql_db:
-    image: mysql:8.0
-    container_name: mysql_database_container
-    restart: always
-    ports:
-      - "3306:3306"
-    environment:
-      - MYSQL_DATABASE=innovatech_db
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - red-innovatech
     volumes:
-      - innovatech_data:/var/lib/mysql
-    networks:
-      - innovatech_network
+      - backend_logs:/app/logs # Ejemplo de persistencia en backend
 
-networks:
-  innovatech_network:
-    driver: bridge
+  db:
+    image: postgres:15-alpine # O mysql:8, según lo que uses
+    environment:
+      - POSTGRES_USER=usuario_prod
+      - POSTGRES_PASSWORD=secreto_seguro
+      - POSTGRES_DB=innovatech_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data # Persistencia crítica exigida en la pauta
+    networks:
+      - red-innovatech
 
 volumes:
-  innovatech_data:
-    driver: local
+  db_data:      # Named volume para asegurar que los datos no se pierdan al reiniciar
+  backend_logs:
+
+networks:
+  red-innovatech:
+    driver: bridge
