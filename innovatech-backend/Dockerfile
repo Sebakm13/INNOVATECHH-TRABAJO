@@ -1,13 +1,22 @@
-FROM maven:3.8.5-eclipse-temurin-17 AS build
+# --- Etapa 1: Build/Instalación ---
+FROM node:20-alpine AS builder
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
+COPY package*.json ./
+RUN npm ci
+COPY . .
 
-FROM eclipse-temurin:17-jdk-jammy
+# --- Etapa 2: Ejecución ---
+FROM node:20-alpine
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
-RUN useradd -m devopsuser && chown -R devopsuser:devopsuser /app
-USER devopsuser
-EXPOSE 8081
-ENTRYPOINT ["java", "-jar", "app.jar"]
+COPY package*.json ./
+# Instalar solo dependencias de producción
+RUN npm ci --only=production 
+COPY --from=builder /app ./
+
+# Crear usuario seguro sin privilegios (No-Root)
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+EXPOSE 3000
+CMD ["node", "server.js"]
