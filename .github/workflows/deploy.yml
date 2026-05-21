@@ -1,47 +1,79 @@
-name: CI/CD Pipeline - Innovatech
+name: Pipeline CI/CD Monorepo Innovatech
 
 on:
   push:
-    branches:
-      - deploy # Trigger obligatorio según pauta
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout del código
-        uses: actions/checkout@v3
+    - name: Checkout del código
+      uses: actions/checkout@v3
 
-      # Autenticación en Docker Hub (o AWS ECR si lo prefieres)
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Login a Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Construcción y subida de la imagen
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-app:latest
+    - name: Build y push Frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./Innovatech-frontend
+        file: ./Innovatech-frontend/Dockerfile
+        push: true
+        tags: sebakm12333/innovatech-frontend:latest
 
-  deploy:
-    needs: build-and-push
+    - name: Build y push Backend Despachos
+      uses: docker/build-push-action@v5
+      with:
+        context: ./innovatech-backend/back-Despachos_SpringBoot
+        file: ./innovatech-backend/back-Despachos_SpringBoot/Dockerfile
+        push: true
+        tags: sebakm12333/innovatech-backend-despachos:latest
+
+    - name: Build y push Backend Ventas
+      uses: docker/build-push-action@v5
+      with:
+        context: ./innovatech-backend/back-Ventas_SpringBoot
+        file: ./innovatech-backend/back-Ventas_SpringBoot/Dockerfile
+        push: true
+        tags: sebakm12333/innovatech-backend-ventas:latest
+
+  deploy-to-aws:
     runs-on: ubuntu-latest
+    needs: build-and-push
     steps:
-      # Conexión SSH a tu instancia EC2 de AWS para actualizar el contenedor
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user # o ubuntu dependiendo de tu AMI
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-app:latest
-            # Aquí detienes el contenedor viejo y corres el nuevo, o ejecutas docker-compose
-            cd /home/ec2-user/proyecto
-            sudo docker-compose down
-            sudo docker-compose up -d
+    - name: Checkout del código
+      uses: actions/checkout@v3
+
+    - name: Desplegar en AWS EC2 vía SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USER }}
+        key: ${{ secrets.AWS_KEY }}
+        command_timeout: 45m
+        script: |
+          echo "Conectado a AWS EC2"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo mkdir -p /usr/local/lib/docker/cli-plugins
+            sudo curl -SL "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          fi
+          cd /home/ec2-user
+          if [ -d "INNOVATECHH-TRABAJO" ]; then
+            cd INNOVATECHH-TRABAJO
+            sudo docker compose down --remove-orphans || true
+            cd ..
+          fi
+          sudo rm -rf INNOVATECHH-TRABAJO
+          sudo docker system prune -f || true
+          git clone https://github.com/Sebakm13/INNOVATECHH-TRABAJO.git
+          cd /home/ec2-user/INNOVATECHH-TRABAJO
+          sudo docker compose -f docker-compose.prod.yml pull
+          sudo docker compose -f docker-compose.prod.yml up -d
+          sleep 20
+          sudo docker compose -f docker-compose.prod.yml ps
